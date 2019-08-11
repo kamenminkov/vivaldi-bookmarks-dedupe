@@ -1,0 +1,21 @@
+{
+	"name": "vivaldi-bookmarks-dedupe",
+	"version": "1.0.0",
+	"description": "",
+	"main": "build/index.js",
+	"scripts": {
+		"start": "node build/index.js",
+		"start-inspect": "node --inspect build/index.js",
+		"watch": "tsc --watch"
+	},
+	"keywords": [],
+	"author": "Kamen Minkov",
+	"license": "ISC",
+	"devDependencies": {
+		"@types/lodash": "4.14.123",
+		"@types/node": "10.12.18"
+	},
+	"dependencies": {
+		"lodash": "4.17.11"
+	}
+}

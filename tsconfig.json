@@ -1,0 +1,11 @@
+{
+	"compilerOptions": {
+		"watch": true,
+		"target": "es6",
+		"module": "commonjs",
+		"strict": true,
+		"esModuleInterop": true,
+		"outDir": "build",
+		"inlineSourceMap": true
+	}
+}

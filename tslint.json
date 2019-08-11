@@ -1,0 +1,20 @@
+{
+	"rules": {
+		"quotemark": {
+			"options": "single"
+		},
+		"no-consecutive-blank-lines": {
+			"options": [
+				1
+			],
+			"severity": "warn"
+		},
+		"indent": {
+			"options": [
+				"tabs",
+				4
+			],
+			"severity": "warn"
+		}
+	}
+}
