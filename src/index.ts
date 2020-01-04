@@ -35,44 +35,40 @@ export function init() {
 					}
 
 					allFolders.push(...queue.filter(child => child.type === 'folder'));
-
-					const groupedDuplicates = [];
-
-					groupedDuplicates.push(...checkAndGroupDuplicates(allFolders));
+					const groupedDuplicates: BookmarkBarChild[][] = [
+						...checkAndGroupDuplicates(allFolders)
+					];
 
 					return { parsedData, groupedDuplicates };
 				})
 				.then(({ parsedData, groupedDuplicates }) => {
-					const dataPromise = new Promise<Bookmarks>((resolve, reject) => {
-						return resolve(parsedData);
-					});
-
-					const duplicatesPromise: Promise<string[]> = aggregateDuplicateIds(
-						groupedDuplicates
-					);
-
-					return Promise.all([dataPromise, duplicatesPromise]);
+					return Promise.all([
+						new Promise<Bookmarks>(resolve => resolve(parsedData)),
+						aggregateDuplicateIds(groupedDuplicates)
+					]);
 				})
 				.then(value => {
 					const bookmarks: Bookmarks = value[0];
-					const duplicates: string[] = value[1];
+					const duplicateIds: string[] = value[1];
 
-					const sortedDuplicates = duplicates.sort(
-						(a, b) => parseInt(a) - parseInt(b)
-					);
-
-					return copyAndDeduplicate(bookmarks, duplicates);
+					return copyAndDeduplicate(bookmarks, duplicateIds);
 				})
-				.then(cleanedUp => {
-					debugger;
-					fs.writeFile(
-						'Bookmarks_cleaned_up.json',
-						JSON.stringify(cleanedUp),
-						{ encoding: 'utf8' },
-						() => {
-							debugger;
-						}
-					);
+				.then(cleanedUpBookmarks => {
+					fs.promises
+						.copyFile('Bookmarks', 'Bookmarks_original')
+						.then(() => fs.promises.unlink('Bookmarks'))
+						.then(() =>
+							fs.promises.writeFile(
+								'Bookmarks',
+								JSON.stringify(cleanedUpBookmarks),
+								{ encoding: 'utf8' }
+							)
+						)
+						.then(() =>
+							console.info(
+								`Written out cleaned up bookmarks as 'Bookmarks', original file copied to 'Bookmarks_original'`
+							)
+						);
 				});
 		}
 	);
@@ -85,7 +81,6 @@ function parseBookmarkData(data: string): Promise<Bookmarks> {
 }
 
 function checkAndGroupDuplicates(folders: BookmarkBarChild[]): BookmarkBarChild[][] {
-	console.log('=====: checkAndGroupDuplicates', checkAndGroupDuplicates);
 	let duplicateGroups: BookmarkBarChild[][] = [];
 
 	for (let folder of folders) {
@@ -114,10 +109,6 @@ function checkAndGroupDuplicates(folders: BookmarkBarChild[]): BookmarkBarChild[
 
 function aggregateDuplicateIds(duplicateGroups: BookmarkBarChild[][]): Promise<string[]> {
 	return new Promise((resolve, reject) => {
-		if (duplicateGroups.length === 0) {
-			reject();
-		}
-
 		const duplicateIds: string[] = [];
 
 		for (const dGroup of duplicateGroups) {
@@ -125,10 +116,6 @@ function aggregateDuplicateIds(duplicateGroups: BookmarkBarChild[][]): Promise<s
 				if (i === '0') continue; // Skip the first in each group, we want to keep it.
 				duplicateIds.push(dGroup[i].id);
 			}
-		}
-
-		if (duplicateIds.length === 0) {
-			reject();
 		}
 
 		resolve(uniq(duplicateIds));

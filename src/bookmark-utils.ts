@@ -44,8 +44,6 @@ export class BookmarkUtils {
 		}
 	}
 
-	public static deduplicateFolder(folder: BookmarkBarChild): void {}
-
 	public static splitDuplicatesIntoGroups(
 		duplicates: BookmarkBarChild[],
 		sortBy: 'date_added' | 'id' = 'id'
@@ -86,7 +84,6 @@ export class BookmarkUtils {
 			);
 		}
 
-		console.log(groups.length);
 		return groups;
 	}
 
