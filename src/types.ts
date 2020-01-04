@@ -59,18 +59,18 @@ export enum Nickname {
 	Empty = '',
 	F = 'f',
 	S = 's',
-	Vtb = 'vtb',
+	Vtb = 'vtb'
 }
 
 export enum Type {
 	Folder = 'folder',
-	URL = 'url',
+	URL = 'url'
 }
 
 export interface FluffyMetaInfo {
-	Description?: string;
-	Nickname?: Nickname;
-	Speeddial?: string;
-	Thumbnail?: string;
 	last_visited_desktop?: string;
+	Description?: string;
+	Nickname?: string;
+	Thumbnail?: string;
+	Speeddial?: string;
 }

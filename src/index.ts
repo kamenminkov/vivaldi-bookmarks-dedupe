@@ -1,73 +1,118 @@
 import fs from 'fs';
 import uniq from 'lodash/uniq';
 
-import { Bookmarks, BookmarkBarChild, BookmarkBar } from './types';
+import { Bookmarks, BookmarkBarChild, BookmarkBar, Type } from './types';
 import { BookmarkUtils } from './bookmark-utils';
 
-let queue: Array<BookmarkBar | BookmarkBarChild> = [];
+let traverseCount: number = 0;
+let excludedBookmarks: BookmarkBarChild[] = [];
 
 export function init() {
 	fs.readFile(
 		'Bookmarks',
 		{ encoding: 'utf8' },
-		(err: Error, data: string) => {
+		(err: NodeJS.ErrnoException | null, data: string) => {
 			if (err) {
-				console.warn('Bookmarks file is probably missing from the root directory.');
-				console.error(err);
+				console.warn(
+					'Bookmarks file is probably missing from the root directory.'
+				);
+
 				return;
 			}
 
-			let bookmarks: Bookmarks;
+			parseBookmarkData(data)
+				.then(parsedData => {
+					const allFolders: BookmarkBarChild[] = [];
+					const queue: BookmarkBarChild[] = [];
 
-			readBookmarkData(data)
-				.then((data) => {
-					bookmarks = data;
-					return checkAndGroupDuplicates(data);
+					const dataRootsBookmarkBarChildren =
+						parsedData.roots.bookmark_bar.children;
+
+					for (const child of dataRootsBookmarkBarChildren) {
+						if (child.type === 'folder') {
+							traverseDown(child, queue);
+						}
+					}
+
+					allFolders.push(...queue.filter(child => child.type === 'folder'));
+
+					const groupedDuplicates = [];
+
+					groupedDuplicates.push(...checkAndGroupDuplicates(allFolders));
+
+					return { parsedData, groupedDuplicates };
 				})
-				.then((data) => aggregateDuplicateIds(data))
-				.then((duplicates) => {
-					const sortedDuplicates = duplicates.sort((a, b) => (parseInt(a) - parseInt(b)));
-					const sortedDuplicateIdsString = sortedDuplicates.map(e => e.toString()).join('\n');
+				.then(({ parsedData, groupedDuplicates }) => {
+					const dataPromise = new Promise<Bookmarks>((resolve, reject) => {
+						return resolve(parsedData);
+					});
 
-					console.log(sortedDuplicateIdsString);
-					// console.log(sortedDuplicateIdsString);
+					const duplicatesPromise: Promise<string[]> = aggregateDuplicateIds(
+						groupedDuplicates
+					);
 
-					traverseAndRemoveDuplicates(bookmarks, sortedDuplicates);
+					return Promise.all([dataPromise, duplicatesPromise]);
+				})
+				.then(value => {
+					const bookmarks: Bookmarks = value[0];
+					const duplicates: string[] = value[1];
+
+					const sortedDuplicates = duplicates.sort(
+						(a, b) => parseInt(a) - parseInt(b)
+					);
+
+					return copyAndDeduplicate(bookmarks, duplicates);
+				})
+				.then(cleanedUp => {
+					debugger;
+					fs.writeFile(
+						'Bookmarks_cleaned_up.json',
+						JSON.stringify(cleanedUp),
+						{ encoding: 'utf8' },
+						() => {
+							debugger;
+						}
+					);
 				});
 		}
 	);
 }
 
-function readBookmarkData(value: string): Promise<Bookmarks> {
+function parseBookmarkData(data: string): Promise<Bookmarks> {
 	return new Promise((resolve, reject) => {
-		resolve(JSON.parse(value));
+		resolve(JSON.parse(data));
 	});
 }
 
-function checkAndGroupDuplicates(bookmarks: Bookmarks): Promise<BookmarkBarChild[][]> {
-	return new Promise((resolve, reject) => {
-		for (let c of bookmarks.roots.bookmark_bar.children) {
-			if (c.type !== 'folder') {
-				continue;
-			}
+function checkAndGroupDuplicates(folders: BookmarkBarChild[]): BookmarkBarChild[][] {
+	console.log('=====: checkAndGroupDuplicates', checkAndGroupDuplicates);
+	let duplicateGroups: BookmarkBarChild[][] = [];
 
-			const duplicateCheck = BookmarkUtils.folderContainsDuplicates(c);
-
-			if (!duplicateCheck.duplicatesExist) {
-				continue;
-			}
-
-			if ((duplicateCheck.duplicates && duplicateCheck.duplicates.length !== 0)) {
-				let duplicateGroups: BookmarkBarChild[][] = BookmarkUtils.splitDuplicatesIntoGroups(duplicateCheck.duplicates, 'id');
-
-				resolve(duplicateGroups);
-			}
+	for (let folder of folders) {
+		if (folder.children && folder.children.length === 0) {
+			continue;
 		}
-	});
+
+		const duplicateCheck = BookmarkUtils.folderContainsDuplicates(folder);
+
+		if (!duplicateCheck.duplicatesExist) {
+			continue;
+		}
+
+		if (duplicateCheck.duplicates && duplicateCheck.duplicates.length !== 0) {
+			duplicateGroups.push(
+				...BookmarkUtils.splitDuplicatesIntoGroups(
+					duplicateCheck.duplicates,
+					'id'
+				)
+			);
+		}
+	}
+
+	return duplicateGroups;
 }
 
 function aggregateDuplicateIds(duplicateGroups: BookmarkBarChild[][]): Promise<string[]> {
-	// debugger;
 	return new Promise((resolve, reject) => {
 		if (duplicateGroups.length === 0) {
 			reject();
@@ -90,42 +135,40 @@ function aggregateDuplicateIds(duplicateGroups: BookmarkBarChild[][]): Promise<s
 	});
 }
 
-function traverseAndRemoveDuplicates(bookmarks: Bookmarks, duplicateIds: string[]): Bookmarks | any {
-	let dedupedBookmarks: Bookmarks | any = null;
+function copyAndDeduplicate(bookmarks: Bookmarks, idsToRemove: string[]): Bookmarks {
+	const cleanedUpBookmarks = Object.assign({}, bookmarks);
 
-	// debugger;
+	const queue: BookmarkBarChild[] = [];
 
-	for (const c of bookmarks.roots.bookmark_bar.children) {
-		traverseDown(c);
+	traverseCount = 0;
+
+	for (const child of bookmarks.roots.bookmark_bar.children) {
+		traverseDown(child, queue);
 	}
 
-	console.log(queue);
+	const folders: BookmarkBarChild[] = queue.filter(e => e.type === Type.Folder);
 
-	// debugger;
+	for (const folder of folders) {
+		folder.children = BookmarkUtils.getNonDuplicateChildren(folder, idsToRemove);
+	}
 
-	return dedupedBookmarks;
+	return cleanedUpBookmarks;
 }
 
-function traverseDown(e: BookmarkBarChild): void {
-	switch (e.type) {
-		case 'folder':
-			folderCount++;
+function traverseDown(e: BookmarkBarChild, queue: any[]): void {
+	traverseCount++;
 
-			if (e.children) {
-				for (const c of e.children) {
-					traverseDown(c);
-				}
+	console.log(`[${traverseCount}] Traversing...`);
+
+	queue.push(e);
+
+	if (e.type === Type.Folder) {
+		if (e.children) {
+			const children = e.children;
+
+			for (const child of children) {
+				traverseDown(child, queue);
 			}
-
-			break;
-		case 'url':
-			queue.push(e);
-			break;
+		}
 	}
 }
-
-function writeDeduplicatedBookmarks(): void {
-
-}
-
-let folderCount: number = 0;

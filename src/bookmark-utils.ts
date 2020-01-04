@@ -1,11 +1,14 @@
-import { BookmarkBarChild, Type } from './types';
+import { BookmarkBarChild, Type, Child } from './types';
 
-const closeMatch = (a: string, b: string): boolean => stripProtocol(a) === stripProtocol(b);
+const closeMatch = (a: string, b: string): boolean =>
+	stripProtocol(a) === stripProtocol(b);
 const stripProtocol = (s: string): string => s.replace(/https?/gim, '');
 
 export class BookmarkUtils {
-	public static folderContainsDuplicates(folder: BookmarkBarChild): { duplicatesExist: boolean, duplicates?: BookmarkBarChild[] } {
-		let duplicates: BookmarkBarChild[] = [];
+	public static folderContainsDuplicates(
+		folder: BookmarkBarChild
+	): { duplicatesExist: boolean; duplicates?: BookmarkBarChild[] } {
+		const duplicates: BookmarkBarChild[] = [];
 
 		if (!folder.children || folder.children.length === 0) {
 			return { duplicatesExist: false };
@@ -13,6 +16,10 @@ export class BookmarkUtils {
 
 		for (let i = 0; i < folder.children.length; i++) {
 			for (let j = 1; j < folder.children.length; j++) {
+				if (i === j) {
+					continue;
+				}
+
 				let childI = folder.children[i];
 				let childJ = folder.children[j];
 
@@ -20,45 +27,38 @@ export class BookmarkUtils {
 					continue;
 				}
 
-				if (
-					i !== j &&
-					(childI.url && childJ.url) &&
-					closeMatch(childI.url, childJ.url)
-				) {
-					duplicates.push(childJ);
+				if (childI.url && childJ.url) {
+					if (closeMatch(childI.url, childJ.url)) {
+						if (!duplicates.includes(childJ)) {
+							duplicates.push(childJ);
+						}
+					}
 				}
 			}
 		}
 
-		if (duplicates && duplicates.length !== 0) {
-			let duplicateUrls: string[] = [];
-
-			for (let i = 0; i < duplicates.length; i++) {
-				if (typeof duplicates[i].url === 'string') {
-					duplicateUrls.push(duplicates[i].url);
-				}
-			}
+		if (duplicates.length === 0) {
+			return { duplicatesExist: false };
+		} else {
+			return { duplicatesExist: true, duplicates: duplicates };
 		}
-
-		return { duplicatesExist: true, duplicates: duplicates };
 	}
 
-	public static deduplicateFolder(folder: BookmarkBarChild): void {
+	public static deduplicateFolder(folder: BookmarkBarChild): void {}
 
-	}
-
-	public static splitDuplicatesIntoGroups(duplicates: BookmarkBarChild[], sortBy: 'date_added' | 'id' = 'id'): BookmarkBarChild[][] {
+	public static splitDuplicatesIntoGroups(
+		duplicates: BookmarkBarChild[],
+		sortBy: 'date_added' | 'id' = 'id'
+	): BookmarkBarChild[][] {
 		const groups: BookmarkBarChild[][] = [];
 
-		const unsortedDuplicates: BookmarkBarChild[] = duplicates.slice();
-
-		/* for (let i = 0; i < duplicates.length; i++) {
-			duplicates[i];
-		} */
-
 		for (let i = 0; i < duplicates.length; i++) {
-			if (groups.length && groups[groups.length - 1].some((b: BookmarkBarChild) => closeMatch(b.url, duplicates[i].url))) {
-
+			if (
+				groups.length &&
+				groups[groups.length - 1].some((b: BookmarkBarChild) =>
+					closeMatch(b.url, duplicates[i].url)
+				)
+			) {
 				continue;
 			}
 
@@ -86,6 +86,14 @@ export class BookmarkUtils {
 			);
 		}
 
+		console.log(groups.length);
 		return groups;
+	}
+
+	public static getNonDuplicateChildren(
+		folder: BookmarkBarChild,
+		duplicateIds: string[]
+	): Child[] {
+		return folder.children!.filter(child => duplicateIds.indexOf(child.id) === -1);
 	}
 }
