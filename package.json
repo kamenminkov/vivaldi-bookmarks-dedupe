@@ -1,17 +1,18 @@
 {
 	"name": "vivaldi-bookmarks-dedupe",
 	"version": "1.0.0",
-	"description": "",
-	"main": "build/index.js",
+	"description": "A simple tool to help resolve bookmark duplication that sometimes happens when using Vivaldi Sync.",
+	"main": "build/app.js",
 	"scripts": {
-		"start": "node build/app.js",
+		"prestart": "npm i",
+		"start": "npm run start-tsnode",
 		"start-inspect": "node --inspect build/app.js",
-		"start-tsnode": "node -r ts-node/register --inspect",
+		"start-tsnode": "node -r ts-node/register --inspect app.ts",
 		"watch": "tsc --watch"
 	},
 	"keywords": [],
 	"author": "Kamen Minkov",
-	"license": "ISC",
+	"license": "MIT",
 	"devDependencies": {
 		"@types/lodash": "4.14.123",
 		"@types/node": "12.12.8",
