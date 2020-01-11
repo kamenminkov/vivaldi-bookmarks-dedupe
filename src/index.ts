@@ -1,25 +1,25 @@
-import fs from 'fs';
-import uniq from 'lodash/uniq';
+import fs, { fstat } from 'fs';
+import path from 'path';
+
+import sanitize from 'sanitize-filename';
 
 import { Bookmarks, BookmarkBarChild, BookmarkBar, Type } from './types';
 import { BookmarkUtils } from './bookmark-utils';
+import * as Config from '../config';
 
 let traverseCount: number = 0;
 let excludedBookmarks: BookmarkBarChild[] = [];
 
-export function init() {
-	fs.readFile(
-		'Bookmarks',
-		{ encoding: 'utf8' },
-		(err: NodeJS.ErrnoException | null, data: string) => {
-			if (err) {
-				console.warn(
-					'Bookmarks file is probably missing from the root directory.'
-				);
+export function readBookmarkFile(path: string): Promise<string> {
+	return fs.promises.readFile(path, { encoding: 'utf8' });
+}
 
-				return;
-			}
-
+export function init(
+	filePath: string,
+	withPaths: boolean = false
+): Promise<string | void> {
+	return readBookmarkFile(filePath)
+		.then(data =>
 			parseBookmarkData(data)
 				.then(parsedData => {
 					const allFolders: BookmarkBarChild[] = [];
@@ -54,24 +54,56 @@ export function init() {
 					return copyAndDeduplicate(bookmarks, duplicateIds);
 				})
 				.then(cleanedUpBookmarks => {
+					let sanitizedFilePath: string = sanitize(filePath, {
+						replacement: '___'
+					}).replace(/\s+/gim, '_');
+
+					const destinationDir: string = Config.WRITE_CLEAN_BOOKMARKS_IN_PLACE
+						? path.dirname(filePath)
+						: '.';
+					const fileNameOriginalFile: string =
+						withPaths && !Config.WRITE_CLEAN_BOOKMARKS_IN_PLACE
+							? `${sanitizedFilePath}_original`
+							: 'Bookmarks_original';
+					const fileNameCleanFile: string =
+						withPaths && !Config.WRITE_CLEAN_BOOKMARKS_IN_PLACE
+							? `${sanitizedFilePath}_clean`
+							: 'Bookmarks';
+
+					const fullDestinationPathOriginalFile: string = path.join(
+						destinationDir,
+						fileNameOriginalFile
+					);
+					const fullDestinationPathCleanFile: string = path.join(
+						destinationDir,
+						fileNameCleanFile
+					);
+
 					fs.promises
-						.copyFile('Bookmarks', 'Bookmarks_original')
-						.then(() => fs.promises.unlink('Bookmarks'))
+						.copyFile(filePath, fullDestinationPathOriginalFile)
+						.then(() => {
+							if (fs.existsSync(fullDestinationPathCleanFile)) {
+								fs.promises.unlink(fullDestinationPathCleanFile);
+							}
+						})
 						.then(() =>
 							fs.promises.writeFile(
-								'Bookmarks',
+								fullDestinationPathCleanFile,
 								JSON.stringify(cleanedUpBookmarks),
 								{ encoding: 'utf8' }
 							)
 						)
 						.then(() =>
 							console.info(
-								`Written out cleaned up bookmarks as 'Bookmarks', original file copied to 'Bookmarks_original'`
+								`Written out cleaned up bookmarks as ${fullDestinationPathCleanFile}, original file copied to ${fullDestinationPathOriginalFile} in ${destinationDir}`
 							)
 						);
-				});
-		}
-	);
+				})
+		)
+		.catch(e => {
+			debugger;
+			return console.error(e);
+		});
 }
 
 function parseBookmarkData(data: string): Promise<Bookmarks> {
@@ -114,11 +146,15 @@ function aggregateDuplicateIds(duplicateGroups: BookmarkBarChild[][]): Promise<s
 		for (const dGroup of duplicateGroups) {
 			for (const i in dGroup) {
 				if (i === '0') continue; // Skip the first in each group, we want to keep it.
-				duplicateIds.push(dGroup[i].id);
+				const id = dGroup[i].id;
+
+				if (duplicateIds.indexOf(id) === -1) {
+					duplicateIds.push(id);
+				}
 			}
 		}
 
-		resolve(uniq(duplicateIds));
+		resolve(duplicateIds);
 	});
 }
 
@@ -145,6 +181,7 @@ function copyAndDeduplicate(bookmarks: Bookmarks, idsToRemove: string[]): Bookma
 function traverseDown(e: BookmarkBarChild, queue: any[]): void {
 	traverseCount++;
 
+	console.clear();
 	console.log(`[${traverseCount}] Traversing...`);
 
 	queue.push(e);
