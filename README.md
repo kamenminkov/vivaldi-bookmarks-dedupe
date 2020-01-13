@@ -30,7 +30,7 @@ Use case `#2`, semi-automated:
 `paths.ts` example on Windows with two Vivaldi instances:
 
 ```typescript
-export const paths: string[] = [
+const paths = [
 	`C:\\Users\\<USERNAME>\\My Program Files\\Vivaldi Snapshot\\User Data\\Default\\Bookmarks`,
 	`C:\\Users\\<USERNAME>\\AppData\\Local\\Vivaldi\\User Data\\Default\\Bookmarks`
 ];
