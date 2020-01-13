@@ -95,7 +95,7 @@ export function init(
 						)
 						.then(() =>
 							console.info(
-								`Written out cleaned up bookmarks as ${fullDestinationPathCleanFile}, original file copied to ${fullDestinationPathOriginalFile} in ${destinationDir}`
+								`Written out cleaned up bookmarks as ${fileNameCleanFile}, original file copied to ${fileNameOriginalFile} in ${destinationDir}`
 							)
 						);
 				})
