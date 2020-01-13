@@ -3,12 +3,12 @@ import path from 'path';
 
 import sanitize from 'sanitize-filename';
 
-import { Bookmarks, BookmarkBarChild, BookmarkBar, Type } from './types';
+import { Bookmarks, BookmarkBarChild, BookmarkBar, Type, Child } from './types';
 import { BookmarkUtils } from './bookmark-utils';
 import * as Config from '../config';
 
 let traverseCount: number = 0;
-let excludedBookmarks: BookmarkBarChild[] = [];
+let removedBookmarks: BookmarkBarChild[] = [];
 
 export function readBookmarkFile(path: string): Promise<string> {
 	return fs.promises.readFile(path, { encoding: 'utf8' });
@@ -93,11 +93,19 @@ export function init(
 								{ encoding: 'utf8' }
 							)
 						)
-						.then(() =>
+						.then(() => {
 							console.info(
-								`Written out cleaned up bookmarks as ${fileNameCleanFile}, original file copied to ${fileNameOriginalFile} in ${destinationDir}`
-							)
-						);
+								`Written out cleaned up bookmarks as "${fileNameCleanFile}", original file copied to "${fileNameOriginalFile}" in "${destinationDir}"`
+							);
+
+							console.info(
+								`Removed bookmarks: ${removedBookmarks.map(
+									b => `${b.name} (${b.url})`
+								)}`
+							);
+
+							removedBookmarks = [];
+						});
 				})
 		)
 		.catch(e => {
@@ -172,6 +180,8 @@ function copyAndDeduplicate(bookmarks: Bookmarks, idsToRemove: string[]): Bookma
 	const folders: BookmarkBarChild[] = queue.filter(e => e.type === Type.Folder);
 
 	for (const folder of folders) {
+		removedBookmarks.push(...BookmarkUtils.getBookmarksToRemove(folder, idsToRemove));
+
 		folder.children = BookmarkUtils.getNonDuplicateChildren(folder, idsToRemove);
 	}
 

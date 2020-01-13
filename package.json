@@ -1,6 +1,6 @@
 {
 	"name": "vivaldi-bookmarks-dedupe",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "A simple tool to help resolve bookmark duplication that sometimes happens when using Vivaldi Sync.",
 	"main": "build/app.js",
 	"scripts": {

@@ -93,4 +93,13 @@ export class BookmarkUtils {
 	): Child[] {
 		return folder.children!.filter(child => duplicateIds.indexOf(child.id) === -1);
 	}
+
+	public static getBookmarksToRemove(
+		folder: BookmarkBarChild,
+		idsToRemove: string[]
+	): Child[] {
+		return folder.children!.filter((child: BookmarkBarChild) =>
+			idsToRemove.includes(child.id)
+		);
+	}
 }
