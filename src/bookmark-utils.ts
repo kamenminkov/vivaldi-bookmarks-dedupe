@@ -1,47 +1,13 @@
 import { BookmarkBarChild, Type, Child } from './types';
+import { arrayContainsDuplicates } from './common-utils';
 
-const closeMatch = (a: string, b: string): boolean =>
-	stripProtocol(a) === stripProtocol(b);
+const closeMatch = (a: BookmarkBarChild, b: BookmarkBarChild): boolean =>
+	stripProtocol(a.url) === stripProtocol(b.url);
 const stripProtocol = (s: string): string => s.replace(/https?/gim, '');
 
 export class BookmarkUtils {
-	public static folderContainsDuplicates(
-		folder: BookmarkBarChild
-	): { duplicatesExist: boolean; duplicates?: BookmarkBarChild[] } {
-		const duplicates: BookmarkBarChild[] = [];
-
-		if (!folder.children || folder.children.length === 0) {
-			return { duplicatesExist: false };
-		}
-
-		for (let i = 0; i < folder.children.length; i++) {
-			for (let j = 1; j < folder.children.length; j++) {
-				if (i === j) {
-					continue;
-				}
-
-				let childI = folder.children[i];
-				let childJ = folder.children[j];
-
-				if (childI.type === Type.Folder || childJ.type === Type.Folder) {
-					continue;
-				}
-
-				if (childI.url && childJ.url) {
-					if (closeMatch(childI.url, childJ.url)) {
-						if (!duplicates.includes(childJ)) {
-							duplicates.push(childJ);
-						}
-					}
-				}
-			}
-		}
-
-		if (duplicates.length === 0) {
-			return { duplicatesExist: false };
-		} else {
-			return { duplicatesExist: true, duplicates: duplicates };
-		}
+	public static bookmarksFolderContainsDuplicates(bookmarks: Child[]) {
+		return arrayContainsDuplicates<Child>(bookmarks, 'url', closeMatch);
 	}
 
 	public static splitDuplicatesIntoGroups(
@@ -54,7 +20,7 @@ export class BookmarkUtils {
 			if (
 				groups.length &&
 				groups[groups.length - 1].some((b: BookmarkBarChild) =>
-					closeMatch(b.url, duplicates[i].url)
+					closeMatch(b, duplicates[i])
 				)
 			) {
 				continue;
@@ -66,7 +32,7 @@ export class BookmarkUtils {
 				let duplicateI: BookmarkBarChild = duplicates[i];
 				let duplicateJ: BookmarkBarChild = duplicates[j];
 
-				if (closeMatch(duplicateI.url, duplicateJ.url)) {
+				if (closeMatch(duplicateI, duplicateJ)) {
 					if (currentDuplicateGroup.indexOf(duplicateI) === -1) {
 						currentDuplicateGroup.push(duplicateI);
 					}

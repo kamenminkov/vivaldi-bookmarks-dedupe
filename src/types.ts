@@ -67,10 +67,38 @@ export enum Type {
 	URL = 'url'
 }
 
-export interface FluffyMetaInfo {
+interface FluffyMetaInfo {
 	last_visited_desktop?: string;
 	Description?: string;
 	Nickname?: string;
 	Thumbnail?: string;
 	Speeddial?: string;
+}
+
+export interface Notes {
+	checksum: string;
+	children: NotesChild[];
+	date_added: string;
+	id: string;
+	subject: string;
+	sync_transaction_version: string;
+	type: string;
+	version: number;
+}
+
+export interface NotesChild {
+	attachments?: Attachment[];
+	content?: string;
+	date_added: string;
+	id: string;
+	subject: string;
+	sync_transaction_version?: string;
+	type: string;
+	url?: string;
+	children?: any[];
+}
+
+interface Attachment {
+	checksum: string;
+	content: string;
 }

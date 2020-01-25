@@ -1,4 +1,4 @@
-import { init, readBookmarkFile } from './src';
+import { init, readFile } from './src';
 import * as Config from './config';
 
 import('./paths')
@@ -9,7 +9,7 @@ import('./paths')
 
 		if (!pathsInputIsValid) {
 			throw new Error(
-				`No paths found. Falling back to ${Config.DEFAULT_INPUT_FILENAME} in the project root.`
+				`No paths found. Falling back to ${Config.DEFAULT_BOOKMARKS_INPUT_FILENAME} in the project root.`
 			);
 		}
 
@@ -24,5 +24,5 @@ import('./paths')
 		);
 	})
 	.catch((e: any) => {
-		readBookmarkFile(Config.DEFAULT_INPUT_FILENAME);
+		readFile(Config.DEFAULT_BOOKMARKS_INPUT_FILENAME);
 	});
