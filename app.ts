@@ -24,5 +24,9 @@ import('./paths')
 		);
 	})
 	.catch((e: any) => {
-		readBookmarkFile(Config.DEFAULT_INPUT_FILENAME);
+		console.error(e);
+
+		init(Config.DEFAULT_INPUT_FILENAME, false).catch(e => {
+			console.error('No Bookmarks file found in root of project.');
+		});
 	});

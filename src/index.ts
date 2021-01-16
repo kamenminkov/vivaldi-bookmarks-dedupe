@@ -1,9 +1,9 @@
-import fs, { fstat } from 'fs';
+import fs from 'fs';
 import path from 'path';
 
 import sanitize from 'sanitize-filename';
 
-import { Bookmarks, BookmarkBarChild, BookmarkBar, Type, Child } from './types';
+import { Bookmarks, BookmarkBarChild, Type } from './types';
 import { BookmarkUtils } from './bookmark-utils';
 import * as Config from '../config';
 
@@ -108,10 +108,7 @@ export function init(
 						});
 				})
 		)
-		.catch(e => {
-			debugger;
-			return console.error(e);
-		});
+		.catch(e => console.error(e));
 }
 
 function parseBookmarkData(data: string): Promise<Bookmarks> {
