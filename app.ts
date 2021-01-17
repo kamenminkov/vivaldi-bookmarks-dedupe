@@ -1,12 +1,23 @@
 import * as Config from './config';
-import { init } from './src';
+import {
+	aggregateDuplicateIds,
+	checkAndGroupDuplicates,
+	copyAndDeduplicate,
+	groupFolders
+} from './src/bookmark-utils';
+import {
+	getFilePaths,
+	parseBookmarkData,
+	readBookmarkFile,
+	writeResults
+} from './src/file-utils';
+import { BookmarkBarChild, Bookmarks } from './src/types';
 
 import('./paths' as any)
 	.then((value: Object & { default: any }) => {
 		const paths: string[] = value.default;
 
-		const pathsInputIsValid: boolean =
-			paths instanceof Array && paths.length > 0;
+		const pathsInputIsValid: boolean = paths instanceof Array && paths.length > 0;
 
 		if (!pathsInputIsValid) {
 			throw new Error(
@@ -19,10 +30,7 @@ import('./paths' as any)
 		promises.reduce(
 			(promiseChain: Promise<any>, currentTask: Promise<any>) =>
 				promiseChain.then(chainResults =>
-					currentTask.then(currentResult => [
-						...chainResults,
-						currentResult
-					])
+					currentTask.then(currentResult => [...chainResults, currentResult])
 				),
 			Promise.resolve([])
 		);
@@ -34,3 +42,48 @@ import('./paths' as any)
 			console.error('No Bookmarks file found in root of project.');
 		});
 	});
+
+function init(filePath: string, withAbsolutePaths: boolean): Promise<string | void> {
+	return readBookmarkFile(filePath)
+		.then(data => parseBookmarkData<Bookmarks>(data))
+		.then(parsedData => {
+			const allFolders: BookmarkBarChild[] = groupFolders(parsedData);
+			const groupedDuplicates: BookmarkBarChild[][] = [
+				...checkAndGroupDuplicates(allFolders)
+			];
+
+			return {
+				bookmarks: parsedData,
+				duplicateIds: aggregateDuplicateIds(groupedDuplicates)
+			};
+		})
+		.then(({ bookmarks, duplicateIds }) => {
+			if (duplicateIds.length === 0) {
+				throw new Error(
+					`No duplicates found. New output files won't be written.`
+				);
+			}
+
+			return copyAndDeduplicate(bookmarks, duplicateIds);
+		})
+		.then(cleanedUpBookmarks => {
+			let {
+				fullDestinationPathOriginalFile,
+				fullDestinationPathCleanFile,
+				fileNameCleanFile,
+				fileNameOriginalFile,
+				destinationDir
+			} = getFilePaths(filePath, withAbsolutePaths);
+
+			writeResults(
+				filePath,
+				fullDestinationPathOriginalFile,
+				fullDestinationPathCleanFile,
+				cleanedUpBookmarks,
+				fileNameCleanFile,
+				fileNameOriginalFile,
+				destinationDir
+			);
+		})
+		.catch(e => console.error(e));
+}
