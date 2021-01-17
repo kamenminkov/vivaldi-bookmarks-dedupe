@@ -121,25 +121,21 @@ export function getBookmarksToRemove(
 	);
 }
 
-export function aggregateDuplicateIds(
-	duplicateGroups: BookmarkBarChild[][]
-): Promise<string[]> {
-	return new Promise((resolve, reject) => {
-		const duplicateIds: string[] = [];
+export function aggregateDuplicateIds(duplicateGroups: BookmarkBarChild[][]): string[] {
+	const duplicateIds: string[] = [];
 
-		for (const dGroup of duplicateGroups) {
-			for (const i in dGroup) {
-				if (i === '0') continue; // Skip the first in each group, we want to keep it.
-				const id = dGroup[i].id;
+	for (const dGroup of duplicateGroups) {
+		for (const i in dGroup) {
+			if (i === '0') continue; // Skip the first in each group, we want to keep it.
+			const id = dGroup[i].id;
 
-				if (duplicateIds.indexOf(id) === -1) {
-					duplicateIds.push(id);
-				}
+			if (duplicateIds.indexOf(id) === -1) {
+				duplicateIds.push(id);
 			}
 		}
+	}
 
-		resolve(duplicateIds);
-	});
+	return duplicateIds;
 }
 
 export function copyAndDeduplicate(
@@ -167,9 +163,10 @@ export function copyAndDeduplicate(
 }
 
 export function resetRemovedBookmarks() {
-	console.info(
-		`Removed bookmarks: ${removedBookmarks.map(b => `${b.name} (${b.url})`)}`
-	);
+	// TODO: Add folder info (i.e. which folder any removed bookmark was in)
+
+	console.info(`Removed bookmarks:`);
+	console.info(`${removedBookmarks.map(b => `${b.name} (${b.url})`).join('\n')}`);
 
 	removedBookmarks = [];
 }

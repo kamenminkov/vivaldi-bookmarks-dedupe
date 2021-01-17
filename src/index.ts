@@ -26,15 +26,20 @@ export function init(
 				...checkAndGroupDuplicates(allFolders)
 			];
 
-			return { parsedData, groupedDuplicates };
+			return {
+				bookmarks: parsedData,
+				duplicateIds: aggregateDuplicateIds(groupedDuplicates)
+			};
 		})
-		.then(({ parsedData, groupedDuplicates }) =>
-			Promise.all([
-				new Promise<Bookmarks>(resolve => resolve(parsedData)),
-				aggregateDuplicateIds(groupedDuplicates)
-			])
-		)
-		.then(([bookmarks, duplicateIds]) => copyAndDeduplicate(bookmarks, duplicateIds))
+		.then(({ bookmarks, duplicateIds }) => {
+			if (duplicateIds.length === 0) {
+				throw new Error(
+					`No duplicates found. New output files won't be written.`
+				);
+			}
+
+			return copyAndDeduplicate(bookmarks, duplicateIds);
+		})
 		.then(cleanedUpBookmarks => {
 			let {
 				fullDestinationPathOriginalFile,
@@ -88,6 +93,10 @@ export function writeResults(
 			);
 
 			resetRemovedBookmarks();
+		})
+		.catch(e => {
+			// TODO: Find out possible cases when this might fail
+			console.error(`Couldn't write output files.`);
 		});
 }
 
