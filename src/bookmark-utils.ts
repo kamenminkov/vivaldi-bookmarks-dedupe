@@ -162,6 +162,32 @@ export function copyAndDeduplicate(
 	return cleanedUpBookmarks;
 }
 
+export function checkAndGroupDuplicates(
+	folders: BookmarkBarChild[]
+): BookmarkBarChild[][] {
+	let duplicateGroups: BookmarkBarChild[][] = [];
+
+	for (let folder of folders) {
+		if (folder.children && folder.children.length === 0) {
+			continue;
+		}
+
+		const duplicateCheck = folderContainsDuplicates(folder);
+
+		if (!duplicateCheck.duplicatesExist) {
+			continue;
+		}
+
+		if (duplicateCheck.duplicates && duplicateCheck.duplicates.length !== 0) {
+			duplicateGroups.push(
+				...splitDuplicatesIntoGroups(duplicateCheck.duplicates, 'id')
+			);
+		}
+	}
+
+	return duplicateGroups;
+}
+
 export function resetRemovedBookmarks() {
 	// TODO: Add folder info (i.e. which folder any removed bookmark was in)
 
