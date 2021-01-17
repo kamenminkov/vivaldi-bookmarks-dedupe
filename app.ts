@@ -1,11 +1,12 @@
-import { init, readBookmarkFile } from './src';
 import * as Config from './config';
+import { init } from './src';
 
-import('./paths')
+import('./paths' as any)
 	.then((value: Object & { default: any }) => {
 		const paths: string[] = value.default;
 
-		const pathsInputIsValid: boolean = paths instanceof Array && paths.length > 0;
+		const pathsInputIsValid: boolean =
+			paths instanceof Array && paths.length > 0;
 
 		if (!pathsInputIsValid) {
 			throw new Error(
@@ -18,7 +19,10 @@ import('./paths')
 		promises.reduce(
 			(promiseChain: Promise<any>, currentTask: Promise<any>) =>
 				promiseChain.then(chainResults =>
-					currentTask.then(currentResult => [...chainResults, currentResult])
+					currentTask.then(currentResult => [
+						...chainResults,
+						currentResult
+					])
 				),
 			Promise.resolve([])
 		);

@@ -1,120 +1,94 @@
-import fs from 'fs';
-import path from 'path';
+import * as fs from 'fs';
+import {
+	aggregateDuplicateIds,
+	copyAndDeduplicate,
+	folderContainsDuplicates,
+	groupFolders,
+	resetRemovedBookmarks,
+	splitDuplicatesIntoGroups
+} from './bookmark-utils';
+import { getFilePaths, parseBookmarkData } from './file-utils';
+import { BookmarkBarChild, Bookmarks } from './types';
 
-import sanitize from 'sanitize-filename';
-
-import { Bookmarks, BookmarkBarChild, Type } from './types';
-import { BookmarkUtils } from './bookmark-utils';
-import * as Config from '../config';
-
-let traverseCount: number = 0;
-let removedBookmarks: BookmarkBarChild[] = [];
-
-export function readBookmarkFile(path: string): Promise<string> {
+function readBookmarkFile(path: string): Promise<string> {
 	return fs.promises.readFile(path, { encoding: 'utf8' });
 }
 
 export function init(
 	filePath: string,
-	withPaths: boolean = false
+	withAbsolutePaths: boolean
 ): Promise<string | void> {
 	return readBookmarkFile(filePath)
-		.then(data =>
-			parseBookmarkData(data)
-				.then(parsedData => {
-					const allFolders: BookmarkBarChild[] = [];
-					const queue: BookmarkBarChild[] = [];
+		.then(data => parseBookmarkData<Bookmarks>(data))
+		.then(parsedData => {
+			const allFolders: BookmarkBarChild[] = groupFolders(parsedData);
+			const groupedDuplicates: BookmarkBarChild[][] = [
+				...checkAndGroupDuplicates(allFolders)
+			];
 
-					const dataRootsBookmarkBarChildren =
-						parsedData.roots.bookmark_bar.children;
-
-					for (const child of dataRootsBookmarkBarChildren) {
-						if (child.type === 'folder') {
-							traverseDown(child, queue);
-						}
-					}
-
-					allFolders.push(...queue.filter(child => child.type === 'folder'));
-					const groupedDuplicates: BookmarkBarChild[][] = [
-						...checkAndGroupDuplicates(allFolders)
-					];
-
-					return { parsedData, groupedDuplicates };
-				})
-				.then(({ parsedData, groupedDuplicates }) => {
-					return Promise.all([
-						new Promise<Bookmarks>(resolve => resolve(parsedData)),
-						aggregateDuplicateIds(groupedDuplicates)
-					]);
-				})
-				.then(value => {
-					const bookmarks: Bookmarks = value[0];
-					const duplicateIds: string[] = value[1];
-
-					return copyAndDeduplicate(bookmarks, duplicateIds);
-				})
-				.then(cleanedUpBookmarks => {
-					let sanitizedFilePath: string = sanitize(filePath, {
-						replacement: '___'
-					}).replace(/\s+/gim, '_');
-
-					const destinationDir: string = Config.WRITE_CLEAN_BOOKMARKS_IN_PLACE
-						? path.dirname(filePath)
-						: '.';
-					const fileNameOriginalFile: string =
-						withPaths && !Config.WRITE_CLEAN_BOOKMARKS_IN_PLACE
-							? `${sanitizedFilePath}_original`
-							: 'Bookmarks_original';
-					const fileNameCleanFile: string =
-						withPaths && !Config.WRITE_CLEAN_BOOKMARKS_IN_PLACE
-							? `${sanitizedFilePath}_clean`
-							: 'Bookmarks';
-
-					const fullDestinationPathOriginalFile: string = path.join(
-						destinationDir,
-						fileNameOriginalFile
-					);
-					const fullDestinationPathCleanFile: string = path.join(
-						destinationDir,
-						fileNameCleanFile
-					);
-
-					fs.promises
-						.copyFile(filePath, fullDestinationPathOriginalFile)
-						.then(() => {
-							if (fs.existsSync(fullDestinationPathCleanFile)) {
-								fs.promises.unlink(fullDestinationPathCleanFile);
-							}
-						})
-						.then(() =>
-							fs.promises.writeFile(
-								fullDestinationPathCleanFile,
-								JSON.stringify(cleanedUpBookmarks),
-								{ encoding: 'utf8' }
-							)
-						)
-						.then(() => {
-							console.info(
-								`Written out cleaned up bookmarks as "${fileNameCleanFile}", original file copied to "${fileNameOriginalFile}" in "${destinationDir}"`
-							);
-
-							console.info(
-								`Removed bookmarks: ${removedBookmarks.map(
-									b => `${b.name} (${b.url})`
-								)}`
-							);
-
-							removedBookmarks = [];
-						});
-				})
+			return { parsedData, groupedDuplicates };
+		})
+		.then(({ parsedData, groupedDuplicates }) =>
+			Promise.all([
+				new Promise<Bookmarks>(resolve => resolve(parsedData)),
+				aggregateDuplicateIds(groupedDuplicates)
+			])
 		)
+		.then(([bookmarks, duplicateIds]) => copyAndDeduplicate(bookmarks, duplicateIds))
+		.then(cleanedUpBookmarks => {
+			let {
+				fullDestinationPathOriginalFile,
+				fullDestinationPathCleanFile,
+				fileNameCleanFile,
+				fileNameOriginalFile,
+				destinationDir
+			} = getFilePaths(filePath, withAbsolutePaths);
+
+			writeResults(
+				filePath,
+				fullDestinationPathOriginalFile,
+				fullDestinationPathCleanFile,
+				cleanedUpBookmarks,
+				fileNameCleanFile,
+				fileNameOriginalFile,
+				destinationDir
+			);
+		})
 		.catch(e => console.error(e));
 }
 
-function parseBookmarkData(data: string): Promise<Bookmarks> {
-	return new Promise((resolve, reject) => {
-		resolve(JSON.parse(data));
-	});
+export function writeResults(
+	filePath: string,
+	fullDestinationPathOriginalFile: string,
+	fullDestinationPathCleanFile: string,
+	cleanedUpBookmarks: Bookmarks,
+	fileNameCleanFile: string,
+	fileNameOriginalFile: string,
+	destDir: string
+) {
+	fs.promises
+		.copyFile(filePath, fullDestinationPathOriginalFile)
+		.then(() => {
+			if (fs.existsSync(fullDestinationPathCleanFile)) {
+				fs.promises.unlink(fullDestinationPathCleanFile);
+			}
+		})
+		.then(() =>
+			fs.promises.writeFile(
+				fullDestinationPathCleanFile,
+				JSON.stringify(cleanedUpBookmarks),
+				{
+					encoding: 'utf8'
+				}
+			)
+		)
+		.then(() => {
+			console.info(
+				`Written out cleaned up bookmarks as "${fileNameCleanFile}", original file copied to "${fileNameOriginalFile}" in "${destDir}"`
+			);
+
+			resetRemovedBookmarks();
+		});
 }
 
 function checkAndGroupDuplicates(folders: BookmarkBarChild[]): BookmarkBarChild[][] {
@@ -125,7 +99,7 @@ function checkAndGroupDuplicates(folders: BookmarkBarChild[]): BookmarkBarChild[
 			continue;
 		}
 
-		const duplicateCheck = BookmarkUtils.folderContainsDuplicates(folder);
+		const duplicateCheck = folderContainsDuplicates(folder);
 
 		if (!duplicateCheck.duplicatesExist) {
 			continue;
@@ -133,73 +107,10 @@ function checkAndGroupDuplicates(folders: BookmarkBarChild[]): BookmarkBarChild[
 
 		if (duplicateCheck.duplicates && duplicateCheck.duplicates.length !== 0) {
 			duplicateGroups.push(
-				...BookmarkUtils.splitDuplicatesIntoGroups(
-					duplicateCheck.duplicates,
-					'id'
-				)
+				...splitDuplicatesIntoGroups(duplicateCheck.duplicates, 'id')
 			);
 		}
 	}
 
 	return duplicateGroups;
-}
-
-function aggregateDuplicateIds(duplicateGroups: BookmarkBarChild[][]): Promise<string[]> {
-	return new Promise((resolve, reject) => {
-		const duplicateIds: string[] = [];
-
-		for (const dGroup of duplicateGroups) {
-			for (const i in dGroup) {
-				if (i === '0') continue; // Skip the first in each group, we want to keep it.
-				const id = dGroup[i].id;
-
-				if (duplicateIds.indexOf(id) === -1) {
-					duplicateIds.push(id);
-				}
-			}
-		}
-
-		resolve(duplicateIds);
-	});
-}
-
-function copyAndDeduplicate(bookmarks: Bookmarks, idsToRemove: string[]): Bookmarks {
-	const cleanedUpBookmarks = Object.assign({}, bookmarks);
-
-	const queue: BookmarkBarChild[] = [];
-
-	traverseCount = 0;
-
-	for (const child of bookmarks.roots.bookmark_bar.children) {
-		traverseDown(child, queue);
-	}
-
-	const folders: BookmarkBarChild[] = queue.filter(e => e.type === Type.Folder);
-
-	for (const folder of folders) {
-		removedBookmarks.push(...BookmarkUtils.getBookmarksToRemove(folder, idsToRemove));
-
-		folder.children = BookmarkUtils.getNonDuplicateChildren(folder, idsToRemove);
-	}
-
-	return cleanedUpBookmarks;
-}
-
-function traverseDown(e: BookmarkBarChild, queue: any[]): void {
-	traverseCount++;
-
-	console.clear();
-	console.log(`[${traverseCount}] Traversing...`);
-
-	queue.push(e);
-
-	if (e.type === Type.Folder) {
-		if (e.children) {
-			const children = e.children;
-
-			for (const child of children) {
-				traverseDown(child, queue);
-			}
-		}
-	}
 }
