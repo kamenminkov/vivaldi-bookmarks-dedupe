@@ -18,31 +18,26 @@ import { BookmarkBarChild, Bookmarks } from './src/types';
 
 preparePrompt();
 
-function showPrompt(paths: string[]) {
-	let prompt = inquirer.createPromptModule({});
-
-	prompt({
-		name: 'paths',
-		message: 'Select paths you want to process',
-		choices: paths,
-		type: 'checkbox'
-	})
-		.then(a => {
-			console.log(a);
-
-			debugger;
-			exit(1);
+function showPrompt(paths: string[]): Promise<string | void | any[]> {
+	return inquirer
+		.createPromptModule()({
+			name: 'paths',
+			message: 'Select the files you want to process',
+			choices: paths,
+			type: 'checkbox'
 		})
+		.then((result: { paths: string[] }) => processPaths(result.paths))
 		.catch(e => console.error(e));
 }
 
-function preparePrompt(): any {
-	Promise.all([importPaths(), testBookmarksFile()])
+function preparePrompt(): Promise<void | Error | undefined> {
+	return Promise.all([importPaths(), testBookmarksFile()])
 		.then(([pathsFromFile, bookmarksFilePath]) => {
-			let paths: string[] = [];
+			// TODO: Consider using a data type for paths instead of bare strings
+			let pathsToProcess: string[] = [];
 
 			if (pathsInputIsValid(pathsFromFile.default)) {
-				paths.push(...pathsFromFile.default);
+				pathsToProcess.push(...pathsFromFile.default);
 			} else {
 				console.info(
 					`No paths found. Falling back to ${Config.DEFAULT_INPUT_FILENAME} in the project root.`
@@ -50,25 +45,25 @@ function preparePrompt(): any {
 			}
 
 			if (pathsInputIsValid(bookmarksFilePath)) {
-				paths.push(fs.realpathSync(bookmarksFilePath[0]));
+				pathsToProcess.push(fs.realpathSync(bookmarksFilePath[0])); // convert to absolute path so that it can be processed like the rest
 			} else {
 				console.info(
 					`No ${Config.DEFAULT_INPUT_FILENAME} file found in root of project.`
 				);
 			}
 
-			if (paths.length === 0) {
-				throw new Error(
+			if (pathsToProcess.length === 0) {
+				return new Error(
 					`Neither paths in ${'./paths'} nor ${
 						Config.DEFAULT_INPUT_FILENAME
 					} found. Exiting...`
 				);
 			}
 
-			showPrompt(paths);
+			showPrompt(pathsToProcess);
 		})
 		.catch(e => {
-			debugger;
+			console.error(e);
 		});
 }
 
@@ -90,37 +85,10 @@ function pathsInputIsValid(paths: string[]): boolean {
 	);
 }
 
-function test() {
-	import('./paths' as any)
-		.then((value: Object & { default: any }) => {
-			const paths: string[] = value.default;
+function processPaths(paths: string[]): Promise<string | void | any[]> {
+	const promises = paths.map((path: string) => init(path, true));
 
-			if (!pathsInputIsValid(paths)) {
-				throw new Error(
-					`No paths found. Falling back to ${Config.DEFAULT_INPUT_FILENAME} in the project root.`
-				);
-			}
-
-			const promises = paths.map((path: string) => init(path, true));
-
-			promises.reduce(
-				(promiseChain: Promise<any>, currentTask: Promise<any>) =>
-					promiseChain.then(chainResults =>
-						currentTask.then(currentResult => [
-							...chainResults,
-							currentResult
-						])
-					),
-				Promise.resolve([])
-			);
-		})
-		.catch((e: any) => {
-			console.error(e);
-
-			init(Config.DEFAULT_INPUT_FILENAME, false).catch(e => {
-				console.error('No Bookmarks file found in root of project.');
-			});
-		});
+	return Promise.all(promises).catch(e => console.error(e));
 }
 
 function init(filePath: string, withAbsolutePaths: boolean): Promise<string | void> {

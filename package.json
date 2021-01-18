@@ -1,7 +1,13 @@
 {
 	"name": "vivaldi-bookmarks-dedupe",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "A simple tool to help resolve bookmark duplication that sometimes happens when using Vivaldi Sync.",
+	"repository": {
+		"url": "https://github.com/kamenminkov/vivaldi-bookmarks-dedupe"
+	},
+	"bugs": {
+		"url": "https://github.com/kamenminkov/vivaldi-bookmarks-dedupe/issues"
+	},
 	"main": "build/app.js",
 	"scripts": {
 		"prestart": "npm i",
@@ -15,14 +21,12 @@
 	"license": "MIT",
 	"devDependencies": {
 		"@types/inquirer": "7.3.1",
-		"@types/lodash": "4.14.123",
 		"@types/node": "12.12.8",
 		"sanitize-filename": "1.6.3",
 		"ts-node": "8.5.2",
 		"typescript": "3.7.2"
 	},
 	"dependencies": {
-		"inquirer": "7.3.3",
-		"lodash": "4.17.19"
+		"inquirer": "7.3.3"
 	}
 }
