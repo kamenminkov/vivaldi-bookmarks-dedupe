@@ -1,9 +1,8 @@
 import * as fs from 'fs';
 import inquirer from 'inquirer';
-import { exit } from 'process';
 import * as Config from './config';
 import {
-	aggregateDuplicateIds,
+	aggregateDuplicateBookmarks,
 	checkAndGroupDuplicates,
 	copyAndDeduplicate,
 	groupFolders
@@ -18,19 +17,23 @@ import { BookmarkBarChild, Bookmarks } from './src/types';
 
 preparePrompt();
 
-function showPrompt(paths: string[]): Promise<string | void | any[]> {
-	return inquirer
+function showPrompt(paths: string[]): void {
+	inquirer
 		.createPromptModule()({
 			name: 'paths',
 			message: 'Select the files you want to process',
 			choices: paths,
 			type: 'checkbox'
 		})
-		.then((result: { paths: string[] }) => processPaths(result.paths))
-		.catch(e => console.error(e));
+		.then((result: { paths: string[] }) => {
+			processPaths(result.paths);
+		})
+		.catch(e => {
+			console.error(e);
+		});
 }
 
-function preparePrompt(): Promise<void | Error | undefined> {
+function preparePrompt(): Promise<Error | void> {
 	return Promise.all([importPaths(), testBookmarksFile()])
 		.then(([pathsFromFile, bookmarksFilePath]) => {
 			// TODO: Consider using a data type for paths instead of bare strings
@@ -45,6 +48,7 @@ function preparePrompt(): Promise<void | Error | undefined> {
 			}
 
 			if (pathsInputIsValid(bookmarksFilePath)) {
+				// TODO: Fix this case so that `Bookmarks` is written to the project directory
 				pathsToProcess.push(fs.realpathSync(bookmarksFilePath[0])); // convert to absolute path so that it can be processed like the rest
 			} else {
 				console.info(
@@ -60,10 +64,10 @@ function preparePrompt(): Promise<void | Error | undefined> {
 				);
 			}
 
-			showPrompt(pathsToProcess);
+			return showPrompt(pathsToProcess);
 		})
 		.catch(e => {
-			console.error(e);
+			throw e;
 		});
 }
 
@@ -102,17 +106,45 @@ function init(filePath: string, withAbsolutePaths: boolean): Promise<string | vo
 
 			return {
 				bookmarks: parsedData,
-				duplicateIds: aggregateDuplicateIds(groupedDuplicates)
+				duplicateBookmarks: aggregateDuplicateBookmarks(groupedDuplicates)
 			};
 		})
-		.then(({ bookmarks, duplicateIds }) => {
-			if (duplicateIds.length === 0) {
+		.then(({ bookmarks, duplicateBookmarks }) => {
+			if (duplicateBookmarks.length === 0) {
 				throw new Error(
 					`No duplicates found. New output files won't be written.`
 				);
 			}
 
-			return copyAndDeduplicate(bookmarks, duplicateIds);
+			return { bookmarks, duplicateBookmarks };
+		})
+		.then(async ({ bookmarks, duplicateBookmarks }) => {
+			const bookmarksForPrompt: {
+				name: string;
+				value: BookmarkBarChild;
+			}[] = duplicateBookmarks.map(bookmark => ({
+				name: `${bookmark.name} (${bookmark.url})`,
+				value: bookmark
+			}));
+
+			console.clear();
+
+			let idsToRemove: string[] = await inquirer
+				.createPromptModule()({
+					name: 'bookmarksToRemove',
+					message: 'Select bookmarks to remove',
+					choices: bookmarksForPrompt,
+					pageSize: 30,
+					type: 'checkbox'
+				})
+				.then((result: { bookmarksToRemove: BookmarkBarChild[] }) =>
+					result.bookmarksToRemove.map(b => b.id)
+				)
+				.catch(e => {
+					throw e;
+				});
+
+			return copyAndDeduplicate(bookmarks, idsToRemove);
 		})
 		.then(cleanedUpBookmarks => {
 			let {

@@ -17,6 +17,7 @@
 		{
 			"name": "Node TS",
 			"type": "node",
+			"console": "integratedTerminal",
 			"protocol": "inspector",
 			"request": "launch",
 			"args": [
@@ -27,7 +28,7 @@
 				"ts-node/register"
 			],
 			"cwd": "${workspaceRoot}",
-			"internalConsoleOptions": "openOnSessionStart",
+			"internalConsoleOptions": "neverOpen",
 			"env": {
 				"TS_NODE_IGNORE": "false"
 			},
@@ -39,23 +40,23 @@
 		{
 			"name": "Node TS Inspect",
 			"type": "node",
+			"protocol": "inspector",
 			"request": "launch",
 			"args": [
 				"${workspaceRoot}/app.ts"
 			],
-			"address": "localhost",
-			"port": 9229,
 			"runtimeArgs": [
 				"--inspect-brk=9229",
 				"-r",
 				"ts-node/register"
 			],
 			"cwd": "${workspaceRoot}",
-			"protocol": "inspector",
 			"internalConsoleOptions": "openOnSessionStart",
 			"env": {
 				"TS_NODE_IGNORE": "false"
-			}
+			},
+			"address": "localhost",
+			"port": 9229,
 		},
 		{
 			"type": "node",
