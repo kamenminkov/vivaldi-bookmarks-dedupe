@@ -5,69 +5,71 @@ import * as Config from '../config';
 import { resetRemovedBookmarks } from './bookmark-utils';
 import { Bookmarks } from './types';
 
-export function getFullDestinationPathCleanFile(
-	destinationDir: string,
-	fileNameCleanFile: string
-): string {
-	return path.join(destinationDir, fileNameCleanFile);
-}
-
-export function getFullDestinationPathOriginalFile(
-	destinationDir: string,
-	fileNameOriginalFile: string
-): string {
-	return path.join(destinationDir, fileNameOriginalFile);
+export function getFullPath(destDir: string, filename: string): string {
+	return path.join(destDir, filename);
 }
 
 export function getFileNameCleanFile(
-	withPaths: boolean,
-	sanitizedFilePath: string
+	sanitizedFilePath: string,
+	fromProjectRoot: boolean
 ): string {
-	return withPaths && !Config.WRITE_CLEAN_BOOKMARKS_IN_PLACE
-		? `${sanitizedFilePath}_clean`
-		: 'Bookmarks';
+	return fromProjectRoot || Config.WRITE_CLEAN_BOOKMARKS_IN_PLACE
+		? Config.DEFAULT_INPUT_FILENAME
+		: `${sanitizedFilePath}_clean`;
 }
 
-export function getFilePaths(filePath: string, withAbsolutePaths: boolean) {
+export function getFilePaths(rawFilePath: string) {
+	const projectDir: string = getProjectDir();
+
+	const fromProjectRoot: boolean = path.dirname(rawFilePath) === projectDir;
+
+	const filePath = fromProjectRoot ? path.basename(rawFilePath) : rawFilePath;
+	const originalFileDir: string = path.dirname(filePath);
+
 	const sanitizedFilePath: string = getSanitizedFilePath(filePath);
-	const destinationDir: string = getDestinationDir(filePath);
+
+	const destDir: string = getDestinationDir(
+		originalFileDir,
+		Config.WRITE_CLEAN_BOOKMARKS_IN_PLACE
+	);
 	const fileNameOriginalFile: string = getFileNameOriginalFile(
-		withAbsolutePaths,
-		sanitizedFilePath
+		sanitizedFilePath,
+		fromProjectRoot
 	);
 	const fileNameCleanFile: string = getFileNameCleanFile(
-		withAbsolutePaths,
-		sanitizedFilePath
-	);
-	const fullDestinationPathOriginalFile: string = getFullDestinationPathOriginalFile(
-		destinationDir,
-		fileNameOriginalFile
-	);
-	const fullDestinationPathCleanFile: string = getFullDestinationPathCleanFile(
-		destinationDir,
-		fileNameCleanFile
+		sanitizedFilePath,
+		fromProjectRoot
 	);
 
 	return {
-		fullDestinationPathOriginalFile,
-		fullDestinationPathCleanFile,
 		fileNameCleanFile,
 		fileNameOriginalFile,
-		destinationDir
+		destDir
 	};
 }
 
 export function getFileNameOriginalFile(
-	withPaths: boolean,
-	sanitizedFilePath: string
+	sanitizedFilePath: string,
+	fromProjectRoot: boolean
 ): string {
-	return withPaths && !Config.WRITE_CLEAN_BOOKMARKS_IN_PLACE
-		? `${sanitizedFilePath}_original`
-		: 'Bookmarks_original';
+	return fromProjectRoot || Config.WRITE_CLEAN_BOOKMARKS_IN_PLACE
+		? `${Config.DEFAULT_INPUT_FILENAME}_original`
+		: `${sanitizedFilePath}_original`;
 }
 
-export function getDestinationDir(filePath: string): string {
-	return Config.WRITE_CLEAN_BOOKMARKS_IN_PLACE ? path.dirname(filePath) : '.';
+export function getDestinationDir(
+	originalFileDir: string,
+	writeResultsInPlace: boolean
+): string {
+	const projectDir: string = getProjectDir();
+
+	return originalFileDir === projectDir || !writeResultsInPlace
+		? projectDir
+		: originalFileDir;
+}
+
+function getProjectDir(): string {
+	return process.cwd();
 }
 
 export function getSanitizedFilePath(filePath: string): string {
@@ -86,25 +88,22 @@ export function parseBookmarkData<T>(data: string): Promise<T> {
 	});
 }
 
-export function writeResults(
-	filePath: string,
-	fullDestinationPathOriginalFile: string,
-	fullDestinationPathCleanFile: string,
-	cleanedUpBookmarks: Bookmarks,
-	fileNameCleanFile: string,
-	fileNameOriginalFile: string,
-	destDir: string
-) {
+export function writeResults(filePath: string, cleanedUpBookmarks: Bookmarks): void {
+	let { fileNameCleanFile, fileNameOriginalFile, destDir } = getFilePaths(filePath);
+
+	const fullDestPathOriginalFile: string = getFullPath(destDir, fileNameOriginalFile);
+	const fullDestPathCleanFile: string = getFullPath(destDir, fileNameCleanFile);
+
 	fs.promises
-		.copyFile(filePath, fullDestinationPathOriginalFile)
+		.copyFile(filePath, fullDestPathOriginalFile)
 		.then(() => {
-			if (fs.existsSync(fullDestinationPathCleanFile)) {
-				fs.promises.unlink(fullDestinationPathCleanFile);
+			if (fs.existsSync(fullDestPathCleanFile)) {
+				fs.promises.unlink(fullDestPathCleanFile);
 			}
 		})
 		.then(() =>
 			fs.promises.writeFile(
-				fullDestinationPathCleanFile,
+				fullDestPathCleanFile,
 				JSON.stringify(cleanedUpBookmarks),
 				{
 					encoding: 'utf8'

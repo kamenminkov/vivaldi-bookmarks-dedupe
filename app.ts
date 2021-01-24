@@ -7,12 +7,7 @@ import {
 	copyAndDeduplicate,
 	groupFolders
 } from './src/bookmark-utils';
-import {
-	getFilePaths,
-	parseBookmarkData,
-	readBookmarkFile,
-	writeResults
-} from './src/file-utils';
+import { parseBookmarkData, readBookmarkFile, writeResults } from './src/file-utils';
 import { BookmarkBarChild, Bookmarks } from './src/types';
 
 preparePrompt();
@@ -57,7 +52,7 @@ function preparePrompt(): Promise<Error | void> {
 			}
 
 			if (pathsToProcess.length === 0) {
-				return new Error(
+				throw new Error(
 					`Neither paths in ${'./paths'} nor ${
 						Config.DEFAULT_INPUT_FILENAME
 					} found. Exiting...`
@@ -147,23 +142,7 @@ function init(filePath: string, withAbsolutePaths: boolean): Promise<string | vo
 			return copyAndDeduplicate(bookmarks, idsToRemove);
 		})
 		.then(cleanedUpBookmarks => {
-			let {
-				fullDestinationPathOriginalFile,
-				fullDestinationPathCleanFile,
-				fileNameCleanFile,
-				fileNameOriginalFile,
-				destinationDir
-			} = getFilePaths(filePath, withAbsolutePaths);
-
-			writeResults(
-				filePath,
-				fullDestinationPathOriginalFile,
-				fullDestinationPathCleanFile,
-				cleanedUpBookmarks,
-				fileNameCleanFile,
-				fileNameOriginalFile,
-				destinationDir
-			);
+			return writeResults(filePath, cleanedUpBookmarks);
 		})
 		.catch(e => console.error(e));
 }
