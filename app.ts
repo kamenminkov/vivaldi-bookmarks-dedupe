@@ -18,7 +18,8 @@ function showPrompt(paths: string[]): void {
 			name: 'paths',
 			message: 'Select the files you want to process',
 			choices: paths,
-			type: 'checkbox'
+			type: 'checkbox',
+			default: paths.length === 1 ? paths : []
 		})
 		.then((result: { paths: string[] }) => {
 			processPaths(result.paths);
@@ -29,8 +30,8 @@ function showPrompt(paths: string[]): void {
 }
 
 function preparePrompt(): Promise<Error | void> {
-	return Promise.all([importPaths(), testBookmarksFile()])
-		.then(([pathsFromFile, bookmarksFilePath]) => {
+	return Promise.all([importPathsFromFile(), getLocalBookmarksFile()])
+		.then(([pathsFromFile, localBookmarksFilePath]) => {
 			// TODO: Consider using a data type for paths instead of bare strings
 			let pathsToProcess: string[] = [];
 
@@ -42,9 +43,9 @@ function preparePrompt(): Promise<Error | void> {
 				);
 			}
 
-			if (pathsInputIsValid(bookmarksFilePath)) {
+			if (pathsInputIsValid(localBookmarksFilePath)) {
 				// TODO: Fix this case so that `Bookmarks` is written to the project directory
-				pathsToProcess.push(fs.realpathSync(bookmarksFilePath[0])); // convert to absolute path so that it can be processed like the rest
+				pathsToProcess.push(fs.realpathSync(localBookmarksFilePath[0])); // convert to absolute path so that it can be processed like the rest
 			} else {
 				console.info(
 					`No ${Config.DEFAULT_INPUT_FILENAME} file found in root of project.`
@@ -66,11 +67,13 @@ function preparePrompt(): Promise<Error | void> {
 		});
 }
 
-function importPaths(path: string = './paths'): Promise<Object & { default: string[] }> {
+function importPathsFromFile(
+	path: string = './paths'
+): Promise<Object & { default: string[] }> {
 	return import(path as any);
 }
 
-function testBookmarksFile(
+function getLocalBookmarksFile(
 	path: string = Config.DEFAULT_INPUT_FILENAME
 ): Promise<string[]> {
 	return new Promise<string[]>(resolve => resolve(fs.existsSync(path) ? [path] : []));
@@ -85,12 +88,12 @@ function pathsInputIsValid(paths: string[]): boolean {
 }
 
 function processPaths(paths: string[]): Promise<string | void | any[]> {
-	const promises = paths.map((path: string) => init(path, true));
+	const promises = paths.map((path: string) => init(path));
 
 	return Promise.all(promises).catch(e => console.error(e));
 }
 
-function init(filePath: string, withAbsolutePaths: boolean): Promise<string | void> {
+function init(filePath: string): Promise<string | void> {
 	return readBookmarkFile(filePath)
 		.then(data => parseBookmarkData<Bookmarks>(data))
 		.then(parsedData => {
@@ -114,17 +117,14 @@ function init(filePath: string, withAbsolutePaths: boolean): Promise<string | vo
 			return { bookmarks, duplicateBookmarks };
 		})
 		.then(async ({ bookmarks, duplicateBookmarks }) => {
-			const bookmarksForPrompt: {
-				name: string;
-				value: BookmarkBarChild;
-			}[] = duplicateBookmarks.map(bookmark => ({
-				name: `${bookmark.name} (${bookmark.url})`,
-				value: bookmark
+			const bookmarksForPrompt = duplicateBookmarks.map(bookmark => ({
+				name: `${bookmark.name} ${bookmark.url}`,
+				value: bookmark.id
 			}));
 
 			console.clear();
 
-			let idsToRemove: string[] = await inquirer
+			const idsToRemove: string[] = await inquirer
 				.createPromptModule()({
 					name: 'bookmarksToRemove',
 					message: 'Select bookmarks to remove',
@@ -132,9 +132,9 @@ function init(filePath: string, withAbsolutePaths: boolean): Promise<string | vo
 					pageSize: 30,
 					type: 'checkbox'
 				})
-				.then((result: { bookmarksToRemove: BookmarkBarChild[] }) =>
-					result.bookmarksToRemove.map(b => b.id)
-				)
+				.then((result: { bookmarksToRemove: string[] }) => {
+					return result.bookmarksToRemove;
+				})
 				.catch(e => {
 					throw e;
 				});
