@@ -121,21 +121,24 @@ export function getBookmarksToRemove(
 	);
 }
 
-export function aggregateDuplicateIds(duplicateGroups: BookmarkBarChild[][]): string[] {
-	const duplicateIds: string[] = [];
+export function aggregateDuplicateBookmarks(
+	duplicateGroups: BookmarkBarChild[][]
+): BookmarkBarChild[] {
+	const duplicateBookmarks: BookmarkBarChild[] = [];
 
 	for (const dGroup of duplicateGroups) {
 		for (const i in dGroup) {
 			if (i === '0') continue; // Skip the first in each group, we want to keep it.
-			const id = dGroup[i].id;
 
-			if (duplicateIds.indexOf(id) === -1) {
-				duplicateIds.push(id);
+			const bookmark = dGroup[i];
+
+			if (!duplicateBookmarks.includes(bookmark)) {
+				duplicateBookmarks.push(bookmark);
 			}
 		}
 	}
 
-	return duplicateIds;
+	return duplicateBookmarks;
 }
 
 export function copyAndDeduplicate(

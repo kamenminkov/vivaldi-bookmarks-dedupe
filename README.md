@@ -55,13 +55,15 @@ Otherwise, if paths are provided in use case `#2` and `WRITE_CLEAN_BOOKMARKS_IN_
 
 -   [Node.js](https://github.com/nodejs/node)
 -   [TypeScript](https://github.com/microsoft/TypeScript)
+-   [Inquirer.js](https://github.com/SBoudrias/Inquirer.js)
 
 ## TODO
 
 -   ~~Automate copying bookmarks from Vivaldi's dir and back into it~~
+-   ~~Have a way to select which bookmark files are processed (if multiple are provided)~~
+-   ~~Implement a way to select which duplicates are removed~~
 -   Have the CLI prompt for settings, e.g. input and output file name and `WRITE_CLEAN_BOOKMARKS_IN_PLACE`
--   Have a way to select which bookmark files are processed (if multiple are provided)
--   Implement a way to select which duplicates are removed
+-   Add tests
 
 ## Authors
 
